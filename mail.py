@@ -1,3 +1,5 @@
+import time
+
 # SMTP Library
 import smtplib
 
@@ -9,91 +11,130 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email import encoders
 
+# PyQt Library
+from PyQt5 import QtCore, QtWidgets
+
 
 # Const Value
 SMTP_SERVER = 'smtp.naver.com'
 SMTP_PORT = 587
 
-# SMTP Authentication
-def auth_mail(user_id, user_pw):
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-        try:
-            # TLS 보안 연결
-            server.starttls()
-            # SMTP 로그인 테스트 (성공)
-            server.login(user_id, user_pw)
+class AuthThread(QtCore.QThread):
+    table_changed = QtCore.pyqtSignal(str, int, int)
+    add_log = QtCore.pyqtSignal(str)
 
-            print('SMTP 사용 가능')
-        except:
-            print('SMTP 사용 불가')
+    def __init__(self, parent, window):
+        super().__init__(parent)
+        self.window = window
 
-# Send Mail
-def send_mail(user_id, user_pw, msg):
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-        try:
-            # TLS 보안 연결
-            server.starttls()
-            # SMTP 로그인 테스트 (성공)
-            server.login(user_id, user_pw)
+    # SMTP Authentication
+    def auth_mail(self, user_id, user_pw):
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            try:
+                # TLS 보안 연결
+                server.starttls()
+                # SMTP 로그인 테스트 (성공)
+                server.login(user_id, user_pw)
 
-            # 메일 전송
-            res = server.sendmail(msg['from'], msg['to'], msg.as_string())
-            if not res:
-                print('메일 전송 성공')
+                return True
+            except:
+                return False
+
+    def run(self):
+        self.add_log.emit('계정 사용가능 여부 체크 시작')
+        idx = 0
+        
+        while idx < self.window.num_of_row_account:
+            user_id = self.window.tableAccount.item(idx, 0).text()
+            user_pw = self.window.tableAccount.item(idx, 1).text()
+            ret = self.auth_mail(user_id, user_pw)
+
+            # 시그널
+            if ret:
+                self.table_changed.emit('Account', idx, 1)
             else:
-                print('메일 전송 실패')
-        except:
-            print('메일 전송 실패')
+                self.table_changed.emit('Account', idx, 0)
 
+            # 인덱스
+            idx = idx + 1
+            time.sleep(0.5)
 
+        self.add_log.emit('계정 사용가능 여부 체크 완료')
 
-idx = 0
+class MailThread(QtCore.QThread):
+    add_log = QtCore.pyqtSignal(str)
 
-# ID/PW 로드 (테스트)
-with open('test.txt', mode='rt', encoding='utf-8') as f:
-    for i in f.readlines():
-        if idx == 1:
-            break
-        temp = i.splitlines()[0].split(' ') 
-        print('ID: {0}, PW: {1}'.format(temp[0], temp[1]))
+    def __init__(self, parent, window):
+        super().__init__(parent)
+        self.window = window
+        self.working = True
 
-        # smtp_test
-        smtp_info = dict({'smtp_server':'smtp.naver.com', 'smtp_port':587})
-        smtp_info['smtp_user_id'] = temp[0]
-        smtp_info['smtp_user_pw'] = temp[1]
+    # Send Mail
+    def send_mail(self, user_id, user_pw, msg):
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            try:
+                # TLS 보안 연결
+                server.starttls()
+                # SMTP 로그인 테스트 (성공)
+                server.login(user_id, user_pw)
 
-        print(smtp_info)
+                # 메일 전송
+                res = server.sendmail(msg['From'], msg['To'], msg.as_string())
+                if not res:
+                    self.add_log.emit('{0} → {1} 전송 완료'.format(user_id, msg['To'].split('@')[0]))
+                else:
+                    self.add_log.emit('{0} → {1} 전송 실패'.format(user_id, msg['To'].split('@')[0]))
+            except:
+                self.add_log.emit('{0} → {1} 전송 실패'.format(user_id, msg['To'].split('@')[0]))
 
-        title = '기본 이메일입니다.'
-        content = '''
-            안녕하세요^^
+    def run(self):
+        self.add_log.emit('메일 발송 시작')
 
-            혹시 블로그를 통해 포스팅 해보실 의향 없으신가요?
-            준비된 원고를 보내드리면 블로그에 복붙해서 올려주시면 되고, 한 건 올리시는데 5분 이내로 소요됩니다.
+        # 종료 플래그
+        is_finish = False
 
-            저희는 업체 홍보 리뷰, 제품, 맛집, 뷰티, 홍보 리뷰를 주로 하는 업체입니다.
+        id_idx = 0  # 계정 인덱스
+        bg_idx = 0  # 블로거 인덱스
+        num_combobox = int(self.window.comboBox.currentText())
 
-            포스팅 비용은 건당 2~3만원 입니다!
+        while id_idx < self.window.num_of_row_account and self.working:
+            # 모두 완료했으면 반복문 빠져 나옴
+            if is_finish:
+                break
+            # 사용가능 여부가 O인 경우
+            if self.window.tableAccount.item(id_idx, 2).text() == 'O':
+                cb_idx = 0
+                # 계정마다 초기 정한 횟수만큼 반복
+                while cb_idx < num_combobox and self.working:
+                    if bg_idx < self.window.num_of_row_blogger:
+                        # Message 생성
+                        subject = self.window.txtSubject.text()
+                        content = self.window.txtContent.toPlainText()
+                        msg = MIMEText(_text=content, _charset='utf-8')
+                        msg['Subject'] = subject
+                        sender = self.window.tableAccount.item(id_idx, 0).text() + '@naver.com'
+                        receiver = self.window.tableBlogger.item(bg_idx, 0).text() + '@naver.com'
+                        msg['From'] = sender
+                        msg['To'] = receiver
+                        # Message 보내기
+                        naver_id = self.window.tableAccount.item(id_idx, 0).text()
+                        naver_pw = self.window.tableAccount.item(id_idx, 1).text()
+                        self.send_mail(naver_id, naver_pw, msg)
+                        # Index 증가
+                        cb_idx = cb_idx + 1
+                        bg_idx = bg_idx + 1
+                        time.sleep(0.2)
+                    else:
+                        is_finish = True
+                        break
 
-            저희 업체는 불법적인 키워드가 아닌 합법적인 키워드만 취급하고 있습니다.
-            원고는 일주일에 10~15건 정도 드리며, 하실 의향이나 궁금하신 점 있으시면 010-8733-7408로 연락주세요!
+            # 네이버 계정 인덱스 증가
+            id_idx = id_idx + 1
 
-            긴 글 읽어주셔서 감사합니다.
-        '''
-        sender = temp[0] + '@naver.com'
-        receiver = 'twenty--@naver.com'
+        self.add_log.emit('메일 발송 완료')
 
-        msg = MIMEText(_text=content, _charset='utf-8')
-        msg['Subject'] = title
-        msg['From'] = sender
-        msg['To'] = receiver
-
-        print(content)
-
-        # # 딜레이를 줘야할 듯?
-        # for i in range(0, 10):
-        auth_mail(temp[0] ,temp[1])
-        # send_mail(smtp_info, msg)
-
-        # 임시
-        idx = idx + 1
+    def stop(self):
+        self.add_log.emit('메일 발송 중단 요청 - 1초 딜레이')
+        self.working = False
+        self.quit()
+        self.wait(1000)
