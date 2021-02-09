@@ -159,7 +159,7 @@ class Ui_MainWindow(object):
 "<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p>\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">긴 글 읽어주셔서 감사합니다.</p></body></html>"))
         self.txtContent.setPlaceholderText(_translate("MainWindow", "내용"))
-        self.txtSubject.setText(_translate("MainWindow", "메일 제목 (블로그 댓글은 설정 안 해도 됨)"))
+        self.txtSubject.setText(_translate("MainWindow", "안녕하세요 블로거님 반갑습니다~"))
         self.txtSubject.setPlaceholderText(_translate("MainWindow", "제목"))
         item = self.tableAccount.horizontalHeaderItem(0)
         item.setText(_translate("MainWindow", "아이디"))

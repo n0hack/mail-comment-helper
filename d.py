@@ -9,6 +9,8 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email import encoders
 
+import os
+
 SMTP_SERVER = 'smtp.naver.com'
 SMTP_PORT = 587
 
@@ -46,11 +48,20 @@ content = '''
 
 긴 글 읽어주셔서 감사합니다.
 '''
-msg = MIMEText(_text=content, _charset='utf-8')
+msg = MIMEMultipart('SendMail')
 msg['Subject'] = subject
 msg['From'] = 'nohack-@naver.com'
 msg['To'] = 'twenty--@naver.com'
 
+img_data = open('./img/test.png', 'rb').read()
+image = MIMEImage(img_data, name=os.path.basename('./img/test.png'))
+msg.attach(image) 
+
+# msg = MIMEText(_text=content, _charset='utf-8')
+# msg['Subject'] = subject
+# msg['From'] = 'nohack-@naver.com'
+# msg['To'] = 'twenty--@naver.com'
+
 print(msg)
 # for i in range(0, 10):
-#     send_mail('nohack-', 'wjswlehf2!N', msg)
+send_mail('nohack-', 'wjswlehf2!N', msg)

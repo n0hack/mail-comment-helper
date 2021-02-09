@@ -1,3 +1,4 @@
+import os
 import time
 
 # SMTP Library
@@ -109,13 +110,17 @@ class MailThread(QtCore.QThread):
                     if bg_idx < self.window.num_of_row_blogger:
                         # Message 생성
                         subject = self.window.txtSubject.text()
-                        content = self.window.txtContent.toPlainText()
-                        msg = MIMEText(_text=content, _charset='utf-8')
+                        msg = MIMEMultipart('SendMail')
+                        # content = self.window.txtContent.toPlainText()
+                        # msg = MIMEText(_text=content, _charset='utf-8')
                         msg['Subject'] = subject
                         sender = self.window.tableAccount.item(id_idx, 0).text() + '@naver.com'
                         receiver = self.window.tableBlogger.item(bg_idx, 0).text() + '@naver.com'
                         msg['From'] = sender
                         msg['To'] = receiver
+                        img_data = open('./img/image.png', 'rb').read()
+                        image = MIMEImage(img_data, name=os.path.basename('./img/image.png'))
+                        msg.attach(image) 
                         # Message 보내기
                         naver_id = self.window.tableAccount.item(id_idx, 0).text()
                         naver_pw = self.window.tableAccount.item(id_idx, 1).text()
